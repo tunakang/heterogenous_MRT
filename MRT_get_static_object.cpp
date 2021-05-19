@@ -18,6 +18,7 @@
 #define READ_QUIT 777
 
 
+
 constexpr int INFINITE = std::numeric_limits<int>::max();
 
 /**
@@ -59,6 +60,7 @@ enum ObjectType : int
 	ROBOT_AND_TASK = 0b0011,
 	WALL = 0b0100
 };
+
 ObjectType operator&(ObjectType lhs, ObjectType rhs) { return static_cast<ObjectType>(static_cast<int>(lhs) & static_cast<int>(rhs)); }
 ObjectType operator|(ObjectType lhs, ObjectType rhs) { return static_cast<ObjectType>(static_cast<int>(lhs) | static_cast<int>(rhs)); }
 ObjectType& operator|=(ObjectType& lhs, ObjectType rhs) { return lhs = lhs | rhs; }
@@ -78,11 +80,11 @@ constexpr RobotType robot_types[3] = { RobotType::DRONE, RobotType::CATERPILLAR,
 std::string robot_names[3] = { "DRONE", "CATERPILLAR", "WHEEL" };
 
 
-int terreinMatrix[NUM_RTYPE][MAP_SIZE][MAP_SIZE];
+int terrainMatrix[NUM_RTYPE][MAP_SIZE][MAP_SIZE];
 int objectMatrix[MAP_SIZE][MAP_SIZE];
 int numRobotMatrix[MAP_SIZE][MAP_SIZE];
 
-int knownTerrein[NUM_RTYPE][MAP_SIZE][MAP_SIZE];
+int knownterrain[NUM_RTYPE][MAP_SIZE][MAP_SIZE];
 int knownObject[MAP_SIZE][MAP_SIZE];
 
 
@@ -162,9 +164,9 @@ ObjectType& known_object_at(Coord coord)
 	return *casted;
 }
 
-int& terrein_cost_at(RobotType type, Coord coord) { return *(*(*(terreinMatrix + static_cast<int>(type)) + coord.x) + coord.y); }
+int& terrain_cost_at(RobotType type, Coord coord) { return *(*(*(terrainMatrix + static_cast<int>(type)) + coord.x) + coord.y); }
 
-int& known_terrein_cost_at(RobotType type, Coord coord) { return *(*(*(knownTerrein + static_cast<int>(type)) + coord.x) + coord.y); }
+int& known_terrain_cost_at(RobotType type, Coord coord) { return *(*(*(knownterrain + static_cast<int>(type)) + coord.x) + coord.y); }
 
 int& num_robots_at(Coord coord) { return *(*(numRobotMatrix + coord.x) + coord.y); }
 
@@ -566,7 +568,7 @@ private:
 		}
 	}
 
-	int get_travel_cost() const noexcept { return terreinMatrix[type][coord.x][coord.y]; }
+	int get_travel_cost() const noexcept { return terrainMatrix[type][coord.x][coord.y]; }
 	// int get_task_cost() const noexcept { return assignedList[current_working_task_idx].get_cost_by_type(type); }
 
 	Robot(int id, Coord position, RobotType type)
@@ -593,18 +595,20 @@ private:
 };
 
 
+
+
 struct Scheduler
 {
 	/**
 	 * @brief change of schedule can occur when the map information is updated
 	 *
 	 * @param known_objects : object(wall, robots, tasks) matrix information available currently
-	 * @param known_terrein : cost consumed at coordinate for each robot
+	 * @param known_terrain : cost consumed at coordinate for each robot
 	 * @param active_tasks :
 	 * @param robot_list : list of robots in simulator
 	 */
 	virtual void on_info_updated(const int(&known_objects)[MAP_SIZE][MAP_SIZE],
-		const int(&known_terrein)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
+		const int(&known_terrain)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
 		const std::vector<TaskView>& active_tasks,
 		const Robot(&robot_list)[NUM_ROBOT]) {}
 
@@ -612,7 +616,7 @@ struct Scheduler
 	 * @brief decide whether to start working on the task at the coordinate
 	 *
 	 * @param known_objects : object(wall, robots, tasks) matrix information available currently
-	 * @param known_terrein : cost consumed at coordinate for each robot
+	 * @param known_terrain : cost consumed at coordinate for each robot
 	 * @param active_tasks :
 	 * @param robot_list : list of robots in simulator
 	 * @param task : the current task.
@@ -620,7 +624,7 @@ struct Scheduler
 	 * @return false : don't satrt working on the task at the coordinate
 	 */
 	virtual bool on_task_reached(const int(&known_objects)[MAP_SIZE][MAP_SIZE],
-		const int(&known_terrein)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
+		const int(&known_terrain)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
 		const std::vector<TaskView>& active_tasks,
 		const Robot(&robot_list)[NUM_ROBOT],
 		const Task& task,
@@ -636,14 +640,14 @@ struct Scheduler
 	 * @brief decide which coordinate the robot will move towards (up, down, left, right)
 	 *
 	 * @param known_objects : object(wall, robots, tasks) matrix information available currently
-	 * @param known_terrein : cost consumed at coordinate for each robot
+	 * @param known_terrain : cost consumed at coordinate for each robot
 	 * @param active_tasks :
 	 * @param robot_list : list of robots in simulator
 	 * @param current_robot : robot with this id will have its direction determined by this function
 	 * @return int
 	 */
 	virtual Action calculate_idle_action(const int(&known_objects)[MAP_SIZE][MAP_SIZE],
-		const int(&known_terrein)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
+		const int(&known_terrain)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
 		const std::vector<TaskView>& active_tasks,
 		const Robot(&robot_list)[NUM_ROBOT],
 		const Robot& current_robot) = 0;
@@ -653,11 +657,52 @@ struct Scheduler
  * @brief Scheduling algorithms can be applied by modifying functions below.
  * funtion information available above
  */
+
+
+struct Node /*added by dongwon */
+{
+	unsigned int G, H;
+	Coord coord;
+	Node *parent;
+
+	Node(Coord coord_, Node *parent_ = nullptr);
+	unsigned int getScore();
+};
+using NodeSet = std::vector<Node*>;
+
+Node::Node(Coord coordinates_, Node *parent_)	/*added by dongwon */
+{
+    parent = parent_;
+    coord = coordinates_;
+    G = H = 0;
+}
+
+unsigned int Node::getScore(){	/*added by dongwon */
+	return G + H;
+}
+
+
+Node* findNodeOnList(NodeSet& nodes_, Coord coord_){	/*added by dongwon */
+	for (auto node : nodes_){
+		if (node->coord == coord_){
+			return node;
+		}
+	}
+	return nullptr;	
+}
+
+unsigned int manhattanDsitance(Coord source_, Coord target_)
+{
+	Coord temp = {abs(source_.x - target_.x),  abs(source_.y - target_.y)};
+	auto delta = std::move(temp);
+	return static_cast<unsigned int> (100*(delta.x + delta.y));
+}
+
 class MyScheduler : public Scheduler
 {
 public:
 	void on_info_updated(const int(&known_objects)[MAP_SIZE][MAP_SIZE],
-		const int(&known_terrein)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
+		const int(&known_terrain)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
 		const std::vector<TaskView>& active_tasks,
 		const Robot(&robot_list)[NUM_ROBOT]) override
 	{
@@ -665,24 +710,102 @@ public:
 	}
 
 	bool on_task_reached(const int(&known_objects)[MAP_SIZE][MAP_SIZE],
-		const int(&known_terrein)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
+		const int(&known_terrain)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
 		const std::vector<TaskView>& active_tasks,
 		const Robot(&robot_list)[NUM_ROBOT],
 		const Task& task,
 		const Robot& current_robot) override
 	{
-		return Scheduler::on_task_reached(known_objects, known_terrein, active_tasks, robot_list, task, current_robot);
+		return Scheduler::on_task_reached(known_objects, known_terrain, active_tasks, robot_list, task, current_robot);
 	}
 
+
 	Action calculate_idle_action(const int(&known_objects)[MAP_SIZE][MAP_SIZE],
-		const int(&known_terrein)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
+		const int(&known_terrain)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
 		const std::vector<TaskView>& active_tasks,
 		const Robot(&robot_list)[NUM_ROBOT],
 		const Robot& current_robot) override
 	{
-		return static_cast<Action>(rand() % 5);
+		Action action;
+		Coord direction[4] = {
+			{0,1},	/* North */
+			{1,0},	/* East */
+			{0,-1}, /* South */		
+			{-1,0}	/* West */
+		}; 
+
+		Coord tempTarget = {0,6};
+
+		if(current_robot.id == CATERPILLAR || current_robot.id == WHEEL){
+		/* A* heuristic */
+		 	Node *current = nullptr;
+			NodeSet openSet, closedSet;
+			openSet.reserve(100);
+			closedSet.reserve(100);			
+			openSet.push_back(new Node(current_robot.coord, nullptr));
+
+			while (!openSet.empty()){
+				auto current_it = openSet.begin();
+				current = *current_it;
+
+				for (auto it = openSet.begin(); it != openSet.end(); it++){
+					auto node = *it;
+					unsigned int node_score = node->getScore();
+					unsigned int current_score = current->getScore();
+					
+					if(node_score <= current_score){
+						current = node;
+						current_it = it;
+					}
+				}
+
+				//if (current->coord == task)/* task found */
+
+				closedSet.push_back(current);
+				openSet.erase(current_it);
+
+				Coord newCoord;
+				unsigned int totalG[4];
+				
+				for (unsigned int i =0; i < 4; ++i)
+				{
+					newCoord = current->coord + direction[i];
+					if (known_objects[newCoord.x][newCoord.y] == WALL ||
+						findNodeOnList(closedSet, newCoord))
+					{						
+						continue;
+					}
+					
+					unsigned int terrainCost = known_terrain[current_robot.id][newCoord.x][newCoord.y];
+					totalG[i] = current-> G + terrainCost;
+
+					Node *successor = findNodeOnList(openSet, newCoord);	/*successor가 무슨 의미지?*/
+					if(successor == nullptr){
+						successor = new Node(newCoord, current);
+						successor->G = totalG[i];
+						successor->H = manhattanDsitance(newCoord, tempTarget);
+						openSet.push_back(successor);
+					}
+					else if (totalG[i] < successor->G){		/*무슨의미일까*/
+						successor->parent = current;
+						successor->G = totalG[i];
+					}
+				}	
+			}
+
+			action = static_cast<Action>(1);
+
+
+
+		} else if (current_robot.id == DRONE){
+		/* Drone Algorithm	*/
+			action = static_cast<Action>(rand() % 5);
+		}
+		return action;
 	}
 };
+
+
 
 
 int main()
@@ -762,7 +885,7 @@ int main()
 		}
 
 		now = get_now();
-		scheduler.on_info_updated(knownObject, knownTerrein, active_tasks, robots);
+		scheduler.on_info_updated(knownObject, knownterrain, active_tasks, robots);
 		update_time_elapsed();
 
 		int num_exhausted = 0;
@@ -797,7 +920,7 @@ int main()
 
 							//decide wether to start working on the task at the coordinate and add algorithm time
 							now = get_now();
-							start_task = scheduler.on_task_reached(knownObject, knownTerrein, active_tasks, robots, task, current_robot);
+							start_task = scheduler.on_task_reached(knownObject, knownterrain, active_tasks, robots, task, current_robot);
 							update_time_elapsed();
 
 							if (start_task)
@@ -888,7 +1011,7 @@ int main()
 			{
 				//decide which direction to move for the robot and add algorithm time
 				now = get_now();
-				Action action = scheduler.calculate_idle_action(knownObject, knownTerrein, active_tasks, robots, current_robot);
+				Action action = scheduler.calculate_idle_action(knownObject, knownterrain, active_tasks, robots, current_robot);
 				update_time_elapsed();
 
 				current_robot.set_target_coordinate(action, /*verbose=*/true);
@@ -1075,7 +1198,7 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 		
 	#endif
 
-	//generate terrein
+	//generate terrain
 	int droneCost = (rand() % 40 + 60) * 2;
 	int tempCost = 0;
 	for (int ii = 0; ii < MAP_SIZE; ii++)
@@ -1084,13 +1207,13 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 		{
 			if (objectMatrix[ii][jj] == WALL)
 			{
-				terreinMatrix[0][ii][jj] = 9999;
-				terreinMatrix[1][ii][jj] = 9999;
-				terreinMatrix[2][ii][jj] = 9999;
+				terrainMatrix[0][ii][jj] = 9999;
+				terrainMatrix[1][ii][jj] = 9999;
+				terrainMatrix[2][ii][jj] = 9999;
 			}
 			else
 			{
-				terreinMatrix[0][ii][jj] = droneCost;
+				terrainMatrix[0][ii][jj] = droneCost;
 				#if DYNAMIC_ENV
 				tempCost = (rand() % 200);	
 				#elif STATIC_ENV
@@ -1159,8 +1282,8 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 				}
 				
 				#endif
-				terreinMatrix[1][ii][jj] = tempCost * 2 + 100;
-				terreinMatrix[2][ii][jj] = tempCost * 4 + 50;
+				terrainMatrix[1][ii][jj] = tempCost * 2 + 100;
+				terrainMatrix[2][ii][jj] = tempCost * 4 + 50;
 			}
 
 		}
@@ -1171,7 +1294,7 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 		for (int jj = 0; jj < MAP_SIZE; jj++)
 		{
 			for (auto type : robot_types)
-				known_terrein_cost_at(type, { ii, jj }) = -1;
+				known_terrain_cost_at(type, { ii, jj }) = -1;
 
 			known_object_at({ ii, jj }) = UNKNOWN;
 		}
@@ -1185,7 +1308,7 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 *  prints out maps
 *	paramOBJECT
 *	OBJECT : object map
-*	ROBOT TYPE : terrein map for that robot type
+*	ROBOT TYPE : terrain map for that robot type
 *	NUMBER : map that shows number of robots on that coordinate
 *
 */
@@ -1202,7 +1325,7 @@ void printMap(int type)
 	else
 
 	{
-		printf("Terrein Map for Robot type %d\n\n", type);
+		printf("terrain Map for Robot type %d\n\n", type);
 	}
 
 	for (int ii = 0; ii < MAP_SIZE; ii++)
@@ -1253,7 +1376,7 @@ void printMap(int type)
 				}
 				else
 				{
-					printf("%4d ", terreinMatrix[type][jj][ii]);
+					printf("%4d ", terrainMatrix[type][jj][ii]);
 				}
 			}
 			if (jj < MAP_SIZE - 1)
@@ -1345,7 +1468,7 @@ void reveal_square_range(Coord centre, int view_range, std::unordered_map<Coord,
 
 			known_object_at(c) = object_at(c);
 			for (RobotType type : robot_types)
-				known_terrein_cost_at(type, c) = terrein_cost_at(type, c);
+				known_terrain_cost_at(type, c) = terrain_cost_at(type, c);
 
 			if (object_at(c) == ObjectType::TASK)
 			{
@@ -1372,7 +1495,7 @@ void reveal_cross_range(Coord centre, int view_range, std::unordered_map<Coord, 
 
 		known_object_at(c) = object_at(c);
 		for (RobotType type : robot_types)
-			known_terrein_cost_at(type, c) = terrein_cost_at(type, c);
+			known_terrain_cost_at(type, c) = terrain_cost_at(type, c);
 		if (object_at(c) == ObjectType::TASK)
 		{
 			auto it = uncharted_tasks.find(c);
@@ -1390,7 +1513,7 @@ void reveal_cross_range(Coord centre, int view_range, std::unordered_map<Coord, 
 
 		known_object_at(c) = object_at(c);
 		for (RobotType type : robot_types)
-			known_terrein_cost_at(type, c) = terrein_cost_at(type, c);
+			known_terrain_cost_at(type, c) = terrain_cost_at(type, c);
 
 		if (object_at(c) == ObjectType::TASK)
 		{
