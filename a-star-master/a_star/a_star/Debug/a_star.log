@@ -1,0 +1,5 @@
+﻿  main.cpp
+  AStar.cpp
+G:\내 드라이브\dongwon\고려대\2021년 1학기\이기종컴퓨터-김종국 교수님\프로젝트\heterogeneous_computer\heterogeneous-computing\a-star-master\main.cpp : fatal error C1033: 'G:\내 드라이브\dongwon\고려대\2021년 1학기\이기종컴퓨터-김종국 교수님\프로젝트\heterogeneous_computer\heterogeneous-computing\a-star-master\a_star\a_star\Debug\vc142.idb' 프로그램 데이터베이스를 열 수 없습니다.
+  코드를 생성하고 있습니다...
+G:\내 드라이브\dongwon\고려대\2021년 1학기\이기종컴퓨터-김종국 교수님\프로젝트\heterogeneous_computer\heterogeneous-computing\a-star-master\source\AStar.cpp : fatal error C1033: 'G:\내 드라이브\dongwon\고려대\2021년 1학기\이기종컴퓨터-김종국 교수님\프로젝트\heterogeneous_computer\heterogeneous-computing\a-star-master\a_star\a_star\Debug\vc142.idb' 프로그램 데이터베이스를 열 수 없습니다.
