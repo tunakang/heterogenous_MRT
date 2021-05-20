@@ -15,6 +15,7 @@
 
 #define DYNAMIC_ENV 0
 #define STATIC_ENV 1
+#define ASTAR_DEBUGGING 1
 #define READ_QUIT 777
 
 
@@ -691,6 +692,13 @@ Node* findNodeOnList(NodeSet& nodes_, Coord coord_){	/*added by dongwon */
 	return nullptr;	
 }
 
+void displayNode(NodeSet& nodes_)
+{
+	for(auto node : nodes_){
+		std::cout<<"coord:" <<node->coord.x<<","<<node->coord.y<<"\t"<<" F:"<< node->G+node->H << ",G:" << node->G <<",H:"<<node->H<<std::endl;
+	}
+}
+
 unsigned int manhattanDsitance(Coord source_, Coord target_)
 {
 	Coord temp = {abs(source_.x - target_.x),  abs(source_.y - target_.y)};
@@ -720,7 +728,7 @@ public:
 	}
 
 
-	Action calculate_idle_action(const int(&known_objects)[MAP_SIZE][MAP_SIZE],
+	Action calculate_idle_action(const int(&known_objects)[MAP_SIZE][MAP_SIZE],		
 		const int(&known_terrain)[NUM_RTYPE][MAP_SIZE][MAP_SIZE],
 		const std::vector<TaskView>& active_tasks,
 		const Robot(&robot_list)[NUM_ROBOT],
@@ -735,22 +743,36 @@ public:
 	
 		}; 
 
-		Coord tempTarget = {0,6};
+		//temp target coord
+		Coord tempTarget = {5,13};		
 
-		if(current_robot.type == WHEEL){
-		/* A* heuristic */
-		 	Node *current = nullptr;
-			NodeSet openSet, closedSet;
+		/**** A* heuristic ****/
+		//if(current_robot.type == CATERPILLAR || current_robot.type == WHEEL )
+		if(current_robot.type == CATERPILLAR)
+		{		
+		
+			Node *current = nullptr;
+			NodeSet openSet;
+			static NodeSet closedSet;		
 			openSet.reserve(100);
-			closedSet.reserve(100);			
+			closedSet.reserve(100);	
+
 			openSet.push_back(new Node(current_robot.coord, nullptr));
 
-			while (!openSet.empty()){			 
-				 
+			while (!openSet.empty()){
+
+				#if ASTAR_DEBUGGING
+				std::cout<<"********openSet********"<<std::endl;
+				displayNode(openSet);
+				std::cout<<"********closedSet********"<<std::endl;
+				displayNode(closedSet);
+				std::cout<<"*************************"<<std::endl;
+				#endif 
+
 				auto current_it = openSet.begin();
 				current = *current_it;
 
-				for (auto it = openSet.begin(); it != openSet.end(); it++){	
+				for (auto it = openSet.begin(); it != openSet.end(); it++){		//iter 1 time
 					auto node = *it;
 					unsigned int node_score = node->getScore();
 					unsigned int current_score = current->getScore();
@@ -765,7 +787,13 @@ public:
 					Coord target = {									
 						(current->coord.x - current_robot.coord.x), 	
 						(current->coord.y - current_robot.coord.y)	
-						};				  		
+						};	
+
+					#if ASTAR_DEBUGGING
+					std::cout<<"selected:"<< current->coord.x <<"," <<current->coord.y<<"\t"
+					<<" F:"<< current->G + current->H << ",G:" << current->G <<",H:"<<current->H << std::endl;
+					std::cout<<"*************************"<<std::endl;
+					#endif
 
 					if (target == direction[UP])
 						return UP;
@@ -778,13 +806,15 @@ public:
 					else 
 						printf("Finding direction error");
 				}			
-					
-
+				auto a = closedSet.begin();
+				auto b = closedSet.end();
+				if(closedSet.begin() != closedSet.end())
+					current->G = known_terrain[current_robot.type][current->coord.x][current->coord.y];
 				closedSet.push_back(current);
 				openSet.erase(current_it);
 
 				Coord newCoord;
-				unsigned int totalG[4];
+				unsigned int totalG;
 				
 				for (unsigned int i =0; i < 4; ++i)
 				{
@@ -796,28 +826,31 @@ public:
 					}
 					
 					unsigned int terrainCost = known_terrain[current_robot.type][newCoord.x][newCoord.y];
-					totalG[i] = current-> G + terrainCost;
+					for(auto pastG: closedSet){
+						totalG = current-> G + terrainCost;
+					}
+					
+					
 
-					Node *successor = findNodeOnList(openSet, newCoord);	/*successor?? ???? ??????*/
+					Node *successor = findNodeOnList(openSet, newCoord);	
 					if(successor == nullptr){
 						successor = new Node(newCoord, current);
-						successor->G = totalG[i];
+						successor->G = totalG;
 						successor->H = manhattanDsitance(newCoord, tempTarget);
 						openSet.push_back(successor);
 					}
-					else if (totalG[i] < successor->G){		/*??????????*/
+					else if (totalG < successor->G){		
 						successor->parent = current;
-						successor->G = totalG[i];
+						successor->G = totalG;
 					}
 				}	
 			}
 
 			action = static_cast<Action>(1);
-
-
-
-		} else if (current_robot.id == DRONE){
-		/* Drone Algorithm	*/
+		} 
+		else if (current_robot.type == DRONE)
+		{
+			/* Drone Algorithm	*/
 			action = static_cast<Action>(rand() % 5);
 		}
 		return action;
