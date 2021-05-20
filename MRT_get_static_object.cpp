@@ -15,7 +15,7 @@
 
 #define DYNAMIC_ENV 0
 #define STATIC_ENV 1
-#define ASTAR_DEBUGGING 1
+#define ASTAR_DEBUGGING 0
 #define READ_QUIT 777
 
 
@@ -595,9 +595,6 @@ private:
 	std::vector<Task> finished_tasks_;
 };
 
-
-
-
 struct Scheduler
 {
 	/**
@@ -654,13 +651,8 @@ struct Scheduler
 		const Robot& current_robot) = 0;
 };
 
-/**
- * @brief Scheduling algorithms can be applied by modifying functions below.
- * funtion information available above
- */
-
-
-struct Node /*added by dongwon */
+/**************************added by dongwon start**************************/
+struct Node 
 {
 	unsigned int G, H;
 	Coord coord;
@@ -671,19 +663,19 @@ struct Node /*added by dongwon */
 };
 using NodeSet = std::vector<Node*>;
 
-Node::Node(Coord coordinates_, Node *parent_)	/*added by dongwon */
+Node::Node(Coord coordinates_, Node *parent_)	
 {
     parent = parent_;
     coord = coordinates_;
     G = H = 0;
 }
 
-unsigned int Node::getScore(){	/*added by dongwon */
+unsigned int Node::getScore(){	
 	return G + H;
 }
 
 
-Node* findNodeOnList(NodeSet& nodes_, Coord coord_){	/*added by dongwon */
+Node* findNodeOnList(NodeSet& nodes_, Coord coord_){	
 	for (auto node : nodes_){
 		if (node->coord == coord_){
 			return node;
@@ -695,7 +687,8 @@ Node* findNodeOnList(NodeSet& nodes_, Coord coord_){	/*added by dongwon */
 void displayNode(NodeSet& nodes_)
 {
 	for(auto node : nodes_){
-		std::cout<<"coord:" <<node->coord.x<<","<<node->coord.y<<"\t"<<" F:"<< node->G+node->H << ",G:" << node->G <<",H:"<<node->H<<std::endl;
+		std::cout<<"coord:" <<node->coord.x<<","<<node->coord.y<<"\t"
+		<<" F:"<< node->G+node->H << ",G:" << node->G <<",H:"<<node->H<<std::endl;
 	}
 }
 
@@ -705,6 +698,15 @@ unsigned int manhattanDsitance(Coord source_, Coord target_)
 	auto delta = std::move(temp);
 	return static_cast<unsigned int> (100*(delta.x + delta.y));
 }
+
+
+/**************************added by dongwon end**************************/
+
+
+/**
+ * @brief Scheduling algorithms can be applied by modifying functions below.
+ * funtion information available above
+ */
 
 class MyScheduler : public Scheduler
 {
@@ -743,19 +745,33 @@ public:
 	
 		}; 
 
-		//temp target coord
-		Coord tempTarget = {5,13};		
+		//temp target task coord
+		Coord tempTarget;
+		switch(current_robot.id) 	/*cater*/
+		{
+			case 1: /*cater*/
+				tempTarget = {5,11};
+				break;
+			case 2:	/*wheel*/
+				tempTarget = {16,7};
+				break;
+			case 4: /*cater*/
+				tempTarget = {0,14};
+				break;
+			case 5:	/*wheel*/
+				tempTarget = {0,6};
+				break;
+		}
 
 		/**** A* heuristic ****/
-		//if(current_robot.type == CATERPILLAR || current_robot.type == WHEEL )
-		if(current_robot.type == CATERPILLAR)
+		if(current_robot.type == CATERPILLAR || current_robot.type == WHEEL )
 		{		
 		
 			Node *current = nullptr;
 			NodeSet openSet;
-			static NodeSet closedSet;		
+			static NodeSet closedSet[4];		
 			openSet.reserve(100);
-			closedSet.reserve(100);	
+			closedSet[current_robot.id].reserve(100);	
 
 			openSet.push_back(new Node(current_robot.coord, nullptr));
 
@@ -806,11 +822,11 @@ public:
 					else 
 						printf("Finding direction error");
 				}			
-				auto a = closedSet.begin();
-				auto b = closedSet.end();
-				if(closedSet.begin() != closedSet.end())
+				auto a = closedSet[current_robot.id].begin();
+				auto b = closedSet[current_robot.id].end();
+				if(closedSet[current_robot.id].begin() != closedSet[current_robot.id].end())
 					current->G = known_terrain[current_robot.type][current->coord.x][current->coord.y];
-				closedSet.push_back(current);
+				closedSet[current_robot.id].push_back(current);
 				openSet.erase(current_it);
 
 				Coord newCoord;
@@ -820,7 +836,7 @@ public:
 				{
 					newCoord = current->coord + direction[i];
 					if (known_objects[newCoord.x][newCoord.y] == WALL ||
-						findNodeOnList(closedSet, newCoord))
+						findNodeOnList(closedSet[current_robot.id], newCoord))
 					{						
 						continue;
 					}
@@ -856,8 +872,6 @@ public:
 		return action;
 	}
 };
-
-
 
 
 int main()
