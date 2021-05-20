@@ -728,15 +728,16 @@ public:
 	{
 		Action action;
 		Coord direction[4] = {
-			{0,1},	/* North */
-			{1,0},	/* East */
-			{0,-1}, /* South */		
-			{-1,0}	/* West */
+			{0,1},	/* UP */
+			{0,-1}, /* DOWN */		
+			{-1,0},	/* LEFT */
+			{1,0}	/* RIGHT */		
+	
 		}; 
 
 		Coord tempTarget = {0,6};
 
-		if(current_robot.id == CATERPILLAR || current_robot.id == WHEEL){
+		if(current_robot.type == WHEEL){
 		/* A* heuristic */
 		 	Node *current = nullptr;
 			NodeSet openSet, closedSet;
@@ -744,11 +745,12 @@ public:
 			closedSet.reserve(100);			
 			openSet.push_back(new Node(current_robot.coord, nullptr));
 
-			while (!openSet.empty()){
+			while (!openSet.empty()){			 
+				 
 				auto current_it = openSet.begin();
 				current = *current_it;
 
-				for (auto it = openSet.begin(); it != openSet.end(); it++){
+				for (auto it = openSet.begin(); it != openSet.end(); it++){	
 					auto node = *it;
 					unsigned int node_score = node->getScore();
 					unsigned int current_score = current->getScore();
@@ -759,7 +761,24 @@ public:
 					}
 				}
 
-				//if (current->coord == task)/* task found */
+				if (current->coord != current_robot.coord){				/* decide where to move  */				
+					Coord target = {									
+						(current->coord.x - current_robot.coord.x), 	
+						(current->coord.y - current_robot.coord.y)	
+						};				  		
+
+					if (target == direction[UP])
+						return UP;
+					else if (target == direction[DOWN])
+						return DOWN;
+					else if (target == direction[LEFT])					
+						return LEFT;
+					else if (target == direction[RIGHT])
+						return RIGHT;			
+					else 
+						printf("Finding direction error");
+				}			
+					
 
 				closedSet.push_back(current);
 				openSet.erase(current_it);
@@ -776,17 +795,17 @@ public:
 						continue;
 					}
 					
-					unsigned int terrainCost = known_terrain[current_robot.id][newCoord.x][newCoord.y];
+					unsigned int terrainCost = known_terrain[current_robot.type][newCoord.x][newCoord.y];
 					totalG[i] = current-> G + terrainCost;
 
-					Node *successor = findNodeOnList(openSet, newCoord);	/*successor가 무슨 의미지?*/
+					Node *successor = findNodeOnList(openSet, newCoord);	/*successor?? ???? ??????*/
 					if(successor == nullptr){
 						successor = new Node(newCoord, current);
 						successor->G = totalG[i];
 						successor->H = manhattanDsitance(newCoord, tempTarget);
 						openSet.push_back(successor);
 					}
-					else if (totalG[i] < successor->G){		/*무슨의미일까*/
+					else if (totalG[i] < successor->G){		/*??????????*/
 						successor->parent = current;
 						successor->G = totalG[i];
 					}
@@ -902,7 +921,7 @@ int main()
 					if (current_robot.coord == current_robot.targetCoord)
 					{
 						if (SIMULATOR_VERBOSE)
-							std::cout << "Robot " << index << " has reached" << current_robot.coord << std::endl;
+							std::cout << "Robot " << index << " has reached " << current_robot.coord << std::endl;
 
 						// Check whether current robot reaches a task.
 						int task_id = current_robot.is_at_task(active_tasks);
@@ -1016,7 +1035,7 @@ int main()
 
 				current_robot.set_target_coordinate(action, /*verbose=*/true);
 				if (SIMULATOR_VERBOSE && current_robot.targetCoord != current_robot.coord)
-					std::cout << "Robot " << index << " targets " << current_robot.targetCoord << ".\n";
+					std::cout << "Robot " << index <<" , " <<" targets " << current_robot.targetCoord << ".\n";
 			}
 			else if (current_robot.status == EXHAUSTED) // Robot has no remaining energy
 			{
