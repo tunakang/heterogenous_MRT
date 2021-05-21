@@ -692,11 +692,14 @@ void displayNode(NodeSet& nodes_)
 	}
 }
 
-unsigned int manhattanDsitance(Coord source_, Coord target_)
+unsigned int manhattanDsitance(Coord source_, Coord target_, unsigned int avgNeighborG)
 {
 	Coord temp = {abs(source_.x - target_.x),  abs(source_.y - target_.y)};
 	auto delta = std::move(temp);
-	return static_cast<unsigned int> (100*(delta.x + delta.y));
+	//return static_cast<unsigned int> (avgNeighborG*(delta.x + delta.y));
+	return static_cast<unsigned int> (avgNeighborG*(delta.x + delta.y));
+	
+	
 }
 
 
@@ -759,41 +762,58 @@ public:
 				tempTarget = {0,14};
 				break;
 			case 5:	/*wheel*/
-				tempTarget = {0,6};
+				tempTarget = {12,2};
 				break;
 		}
 
 		/**** A* heuristic ****/
 		if(current_robot.type == CATERPILLAR || current_robot.type == WHEEL )
+		//if(current_robot.id == 2 )
 		{		
 		
 			Node *current = nullptr;
 			NodeSet openSet;
 			static NodeSet closedSet[4];		
-			openSet.reserve(100);
-			closedSet[current_robot.id].reserve(100);	
+			openSet.reserve(MAP_SIZE*MAP_SIZE);
+			closedSet[current_robot.id].reserve(MAP_SIZE*MAP_SIZE);	
 
+			static int aaa;
+			aaa++;
 			openSet.push_back(new Node(current_robot.coord, nullptr));
 
 			while (!openSet.empty()){
 
 				#if ASTAR_DEBUGGING
 				std::cout<<"********openSet********"<<std::endl;
-				displayNode(openSet);
+				for(auto node : openSet){
+					std::cout<<"coord:" <<node->coord.x<<","<<node->coord.y<<"\t"
+					<<" F:"<< node->G+node->H << ",G:" << node->G <<",H:"<<node->H<<std::endl;
+				}
 				std::cout<<"********closedSet********"<<std::endl;
-				displayNode(closedSet);
+				for(auto node : closedSet[current_robot.id]){
+					std::cout<<"coord:" <<node->coord.x<<","<<node->coord.y<<"\t"
+					<<" F:"<< node->G+node->H << ",G:" << node->G <<",H:"<<node->H<<std::endl;
+				}
 				std::cout<<"*************************"<<std::endl;
 				#endif 
 
+				
+
+
 				auto current_it = openSet.begin();
 				current = *current_it;
+				
+				unsigned int nodeScore=0;
+				unsigned int currentScore=0;
 
-				for (auto it = openSet.begin(); it != openSet.end(); it++){		//iter 1 time
+
+				for (auto it = openSet.begin(); it != openSet.end(); it++){		
 					auto node = *it;
-					unsigned int node_score = node->getScore();
-					unsigned int current_score = current->getScore();
-					
-					if(node_score <= current_score){
+
+					nodeScore = node->getScore();
+					currentScore = current->getScore();
+
+					if(nodeScore <= currentScore){
 						current = node;
 						current_it = it;
 					}
@@ -822,45 +842,69 @@ public:
 					else 
 						printf("Finding direction error");
 				}			
-				auto a = closedSet[current_robot.id].begin();
-				auto b = closedSet[current_robot.id].end();
+
 				if(closedSet[current_robot.id].begin() != closedSet[current_robot.id].end())
 					current->G = known_terrain[current_robot.type][current->coord.x][current->coord.y];
 				closedSet[current_robot.id].push_back(current);
 				openSet.erase(current_it);
 
 				Coord newCoord;
-				unsigned int totalG;
-				
-				for (unsigned int i =0; i < 4; ++i)
+				unsigned int totalG;									
+
+				unsigned int avgNeighborG=0;
+				unsigned int openSetCounter=0;
+
+				Node *successor[(int)(sizeof(direction)/sizeof(Coord))];
+
+				//previous cal avg neighbor G
+				for (unsigned int i =UP; i < (int)(sizeof(direction)/sizeof(Coord)); i++)
 				{
 					newCoord = current->coord + direction[i];
 					if (known_objects[newCoord.x][newCoord.y] == WALL ||
+						newCoord.x <0 || newCoord.y<0 || newCoord.x>MAP_SIZE || newCoord.y>MAP_SIZE||
 						findNodeOnList(closedSet[current_robot.id], newCoord))
 					{						
 						continue;
 					}
 					
 					unsigned int terrainCost = known_terrain[current_robot.type][newCoord.x][newCoord.y];
-					for(auto pastG: closedSet){
-						totalG = current-> G + terrainCost;
+					for(auto pastNode: closedSet[current_robot.id]){
+						totalG = current-> G + terrainCost + pastNode->G;
 					}
-					
-					
 
-					Node *successor = findNodeOnList(openSet, newCoord);	
-					if(successor == nullptr){
-						successor = new Node(newCoord, current);
-						successor->G = totalG;
-						successor->H = manhattanDsitance(newCoord, tempTarget);
-						openSet.push_back(successor);
+					successor[i] = findNodeOnList(openSet, newCoord);	
+					if(successor[i] == nullptr){
+						successor[i] = new Node(newCoord, current);
+						successor[i]->G = totalG;
 					}
-					else if (totalG < successor->G){		
-						successor->parent = current;
-						successor->G = totalG;
+					else if (totalG < successor[i]->G){		
+						successor[i]->parent = current;
+						successor[i]->G = totalG;
 					}
-				}	
-			}
+
+					avgNeighborG += totalG;
+					openSetCounter++;
+				}
+				if (openSetCounter != 0)
+					avgNeighborG = (unsigned int)(avgNeighborG / openSetCounter);
+
+				Node ** nodeCalculatedG;
+				
+				for (unsigned int i =UP; i < (int)(sizeof(direction)/sizeof(Coord)); i++)
+				{
+					newCoord = current->coord + direction[i];
+					if (known_objects[newCoord.x][newCoord.y] == WALL ||
+						newCoord.x <0 || newCoord.y<0 || newCoord.x>MAP_SIZE || newCoord.y>MAP_SIZE||
+						findNodeOnList(closedSet[current_robot.id], newCoord))
+					{						
+						continue;
+					}
+					
+					nodeCalculatedG=successor;
+					(*(nodeCalculatedG+i))->H = manhattanDsitance(newCoord, tempTarget, avgNeighborG);
+					openSet.push_back(*(nodeCalculatedG+i));
+				}
+			 }
 
 			action = static_cast<Action>(1);
 		} 
@@ -1190,11 +1234,10 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 	fp = fopen(".\\static_env\\wall.txt", "r");
 	if(fp == NULL){
 		printf("fail to open wall.txt\n");
-		return ;
+		std::abort();
 	}
 
 	int ii=0, jj=0, count=0;
-	printf("wall coord\n", count, ii, jj);
 	while (1)
 	{
 		
@@ -1203,7 +1246,7 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 			break;
 
 		objectMatrix[ii][jj] = WALL;
-		printf("[cnt=%d]\t[ii=%d]\t[jj=%d]\n", count, ii, jj);
+
 	}
 	fclose(fp);
 	
@@ -1213,10 +1256,9 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 	fp = fopen(".\\static_env\\robot.txt", "r");
 	if(fp == NULL){
 		printf("fail to open robot.txt\n");
-		return ;
+		std::abort();
 	}
 	
-	printf("robot coord\n", count, ii, jj);
 	for(count =0; count <NUM_ROBOT; count ++)
 	{		
 		fscanf(fp, "%d %d", &ii, &jj);
@@ -1228,7 +1270,7 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 			
 		RobotType type = static_cast<RobotType>(count % NUM_RTYPE);
 		robots[count] = Robot::create_new(count, position, type);		 
-		printf("[cnt=%d]\t[ii=%d]\t[jj=%d]\n", count, ii, jj);
+
 		object_at(position) = ROBOT;
 		num_robots_at(position) += 1;
 	}
@@ -1240,11 +1282,11 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 	fp = fopen(".\\static_env\\task.txt", "r");
 	if(fp == NULL){
 		printf("fail to open task.txt\n");
-		return ;
+		std::abort();
 	}
 	uncharted_tasks.reserve(NUM_MAX_TASKS);
 
-	printf("task coord\n", count, ii, jj);
+
 	for (count = 0; count < NUM_INITIAL_TASKS; count++)
 	{
 		fscanf(fp, "%d %d", &ii, &jj);
@@ -1257,7 +1299,6 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 		rand() % 100 + 50,	//CATER
 		rand() % 200 + 0});	//WHEEL			
 
-		printf("[cnt=%d]\t[ii=%d]\t[jj=%d]\n", count, ii, jj);
 		object_at(all_tasks[count].coord) = TASK;
 		uncharted_tasks.insert({ all_tasks[count].coord, &all_tasks[count] });
 	}
@@ -1267,8 +1308,16 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 	//generate terrain
 	int droneCost = (rand() % 40 + 60) * 2;
 	int tempCost = 0;
+	fp=fopen(".\\static_env\\static_terrain.txt","r");
+	if(fp == NULL){
+		printf("fail to open wall.txt\n");
+		std::abort();
+	}
+
 	for (int ii = 0; ii < MAP_SIZE; ii++)
 	{
+		/* fixed moving cost */
+		fscanf(fp,"%d", &tempCost);		
 		for (int jj = 0; jj < MAP_SIZE; jj++)
 		{
 			if (objectMatrix[ii][jj] == WALL)
@@ -1283,69 +1332,6 @@ void generateMap(Robot* robots, Task* all_tasks, std::unordered_map<Coord, Task*
 				#if DYNAMIC_ENV
 				tempCost = (rand() % 200);	
 				#elif STATIC_ENV
-				switch (ii) /* fixed moving cost */
-				{
-					case 0: 
-						tempCost = 30;	
-						break;
-					case 1: 
-						tempCost = 20;	
-						break;
-					case 2: 
-						tempCost = 10;	
-						break;
-					case 3: 
-						tempCost = 20;	
-						break;
-					case 4: 
-						tempCost = 30;	
-						break;
-					case 5: 
-						tempCost = 40;	
-						break;
-					case 6: 
-						tempCost = 20;	
-						break;
-					case 7: 
-						tempCost = 60;	
-						break;
-					case 8: 
-						tempCost = 70;	
-						break;
-					case 9: 
-						tempCost = 30;	
-						break;
-					case 10: 
-						tempCost = 70;	
-						break;
-					case 11: 
-						tempCost = 40;	
-						break;
-					case 12: 
-						tempCost = 70;	
-						break;
-					case 13: 
-						tempCost = 110;	
-						break;
-					case 14: 
-						tempCost = 20;	
-						break;
-					case 15: 
-						tempCost = 30;	
-						break;
-					case 16: 
-						tempCost = 70;	
-						break;
-					case 17: 
-						tempCost = 90;	
-						break;
-					case 18: 
-						tempCost = 70;	
-						break;
-					case 19: 
-						tempCost = 10;	
-						break;		
-				}
 				
 				#endif
 				terrainMatrix[1][ii][jj] = tempCost * 2 + 100;
