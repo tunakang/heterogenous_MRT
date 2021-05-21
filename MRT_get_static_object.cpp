@@ -703,9 +703,6 @@ unsigned int manhattanDsitance(Coord source_, Coord target_, unsigned int avgNei
 }
 
 
-/**************************added by dongwon end**************************/
-
-
 /**
  * @brief Scheduling algorithms can be applied by modifying functions below.
  * funtion information available above
@@ -750,7 +747,7 @@ public:
 
 		//temp target task coord
 		Coord tempTarget;
-		switch(current_robot.id) 	/*cater*/
+		switch(current_robot.id) 
 		{
 			case 1: /*cater*/
 				tempTarget = {5,11};
@@ -762,13 +759,12 @@ public:
 				tempTarget = {0,14};
 				break;
 			case 5:	/*wheel*/
-				tempTarget = {12,2};
+				tempTarget = {13,14};
 				break;
 		}
 
 		/**** A* heuristic ****/
 		if(current_robot.type == CATERPILLAR || current_robot.type == WHEEL )
-		//if(current_robot.id == 2 )
 		{		
 		
 			Node *current = nullptr;
@@ -797,15 +793,11 @@ public:
 				std::cout<<"*************************"<<std::endl;
 				#endif 
 
-				
-
-
 				auto current_it = openSet.begin();
 				current = *current_it;
 				
 				unsigned int nodeScore=0;
 				unsigned int currentScore=0;
-
 
 				for (auto it = openSet.begin(); it != openSet.end(); it++){		
 					auto node = *it;
@@ -819,7 +811,8 @@ public:
 					}
 				}
 
-				if (current->coord != current_robot.coord){				/* decide where to move  */				
+				/* decide where to move  */				
+				if (current->coord != current_robot.coord){				
 					Coord target = {									
 						(current->coord.x - current_robot.coord.x), 	
 						(current->coord.y - current_robot.coord.y)	
@@ -856,10 +849,12 @@ public:
 
 				Node *successor[(int)(sizeof(direction)/sizeof(Coord))];
 
-				//previous cal avg neighbor G
+				//Calculate average of neighbor's G(i) first for manhattan distance
 				for (unsigned int i =UP; i < (int)(sizeof(direction)/sizeof(Coord)); i++)
 				{
 					newCoord = current->coord + direction[i];
+
+					//No access zone = WALL, out of map, already passed block
 					if (known_objects[newCoord.x][newCoord.y] == WALL ||
 						newCoord.x <0 || newCoord.y<0 || newCoord.x>MAP_SIZE || newCoord.y>MAP_SIZE||
 						findNodeOnList(closedSet[current_robot.id], newCoord))
@@ -890,6 +885,7 @@ public:
 
 				Node ** nodeCalculatedG;
 				
+				
 				for (unsigned int i =UP; i < (int)(sizeof(direction)/sizeof(Coord)); i++)
 				{
 					newCoord = current->coord + direction[i];
@@ -901,12 +897,15 @@ public:
 					}
 					
 					nodeCalculatedG=successor;
+
+					// H is applied with average of neighbor block's G
 					(*(nodeCalculatedG+i))->H = manhattanDsitance(newCoord, tempTarget, avgNeighborG);
 					openSet.push_back(*(nodeCalculatedG+i));
 				}
 			 }
 
-			action = static_cast<Action>(1);
+			//if robot is surrounded by closedSet, WALL, out of map, it goes DOWN first
+			action = static_cast<Action>(DOWN);
 		} 
 		else if (current_robot.type == DRONE)
 		{
